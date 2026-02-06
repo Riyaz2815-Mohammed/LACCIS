@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import LegalTeam from './pages/LegalTeam';
 import Upload from './pages/Upload';
 import './App.css';
 
@@ -41,15 +42,23 @@ function App() {
             path="/login"
             element={
               isAuthenticated ?
-                <Navigate to={user?.role === 'admin' ? '/dashboard' : '/upload'} /> :
+                <Navigate to="/dashboard" /> :
                 <Login onLogin={handleLogin} />
             }
           />
           <Route
             path="/dashboard"
             element={
-              isAuthenticated && user?.role === 'admin' ?
+              isAuthenticated ?
                 <Dashboard user={user} onLogout={handleLogout} /> :
+                <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/legal-team"
+            element={
+              isAuthenticated && user?.role === 'admin' ?
+                <LegalTeam user={user} onLogout={handleLogout} /> :
                 <Navigate to="/login" />
             }
           />

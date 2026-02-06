@@ -3,10 +3,10 @@ import './UploadArea.css';
 
 const API_URL = 'http://localhost:8000';
 
-function UploadArea({ onUploadComplete }) {
+function UploadArea({ onUploadComplete, documentType: externalDocumentType }) {
     const [files, setFiles] = useState([]);
     const [dragOver, setDragOver] = useState(false);
-    const [documentType, setDocumentType] = useState('NDA');
+    const [documentType, setDocumentType] = useState(externalDocumentType || 'NDA');
     const [error, setError] = useState('');
 
     const handleDragOver = (e) => {
@@ -133,29 +133,31 @@ function UploadArea({ onUploadComplete }) {
 
     return (
         <>
-            <div className="document-type-selector">
-                <label htmlFor="documentType">Document Type:</label>
-                <select
-                    id="documentType"
-                    value={documentType}
-                    onChange={(e) => setDocumentType(e.target.value)}
-                    className="form-control"
-                    style={{ marginTop: '0.5rem' }}
-                >
-                    <option value="NDA">NDA (Non-Disclosure Agreement)</option>
-                    <option value="MSA">MSA (Master Service Agreement)</option>
-                    <option value="SOW">SOW (Statement of Work)</option>
-                    <option value="Redlined">Redlined Document</option>
-                    <option value="Others">Others</option>
-                </select>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    {documentType === 'NDA' && '⚠️ NDA must be uploaded and approved first'}
-                    {documentType === 'MSA' && 'Master Service Agreement - Requires approved NDA'}
-                    {documentType === 'SOW' && 'Statement of Work - Requires approved NDA'}
-                    {documentType === 'Redlined' && 'Document with tracked changes'}
-                    {documentType === 'Others' && 'Other legal documents'}
-                </p>
-            </div>
+            {!externalDocumentType && (
+                <div className="document-type-selector">
+                    <label htmlFor="documentType">Document Type:</label>
+                    <select
+                        id="documentType"
+                        value={documentType}
+                        onChange={(e) => setDocumentType(e.target.value)}
+                        className="form-control"
+                        style={{ marginTop: '0.5rem' }}
+                    >
+                        <option value="NDA">NDA (Non-Disclosure Agreement)</option>
+                        <option value="MSA">MSA (Master Service Agreement)</option>
+                        <option value="SOW">SOW (Statement of Work)</option>
+                        <option value="Redlined">Redlined Document</option>
+                        <option value="Others">Others</option>
+                    </select>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                        {documentType === 'NDA' && '⚠️ NDA must be uploaded and approved first'}
+                        {documentType === 'MSA' && 'Master Service Agreement - Requires approved NDA'}
+                        {documentType === 'SOW' && 'Statement of Work - Requires approved NDA'}
+                        {documentType === 'Redlined' && 'Document with tracked changes'}
+                        {documentType === 'Others' && 'Other legal documents'}
+                    </p>
+                </div>
+            )}
 
             {error && (
                 <div className="alert alert-error" style={{ marginTop: '1rem' }}>

@@ -3,11 +3,16 @@ import Navbar from '../components/Navbar';
 import ClientForm from '../components/ClientForm';
 import ClientsTable from '../components/ClientsTable';
 import StatsCard from '../components/StatsCard';
+import ClientDashboard from './ClientDashboard';
 import './Dashboard.css';
 
 const API_URL = 'http://localhost:8000';
 
 function Dashboard({ user, onLogout }) {
+    if (user.role === 'client') {
+        return <ClientDashboard user={user} onLogout={onLogout} />;
+    }
+
     const [clients, setClients] = useState([]);
     const [stats, setStats] = useState({ totalDocs: 0, totalClients: 0 });
     const [loading, setLoading] = useState(true);

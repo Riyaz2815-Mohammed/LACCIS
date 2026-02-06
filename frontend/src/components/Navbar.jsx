@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import './Navbar.css';
 
 function Navbar({ user, onLogout, title = "LACCIS Dashboard" }) {
@@ -7,7 +8,15 @@ function Navbar({ user, onLogout, title = "LACCIS Dashboard" }) {
 
     return (
         <nav className="navbar">
-            <h2>{title}</h2>
+            <div className="navbar-left">
+                <h2>{title}</h2>
+                {user?.role === 'admin' && (
+                    <div className="nav-links">
+                        <Link to="/dashboard" className="nav-link">Clients</Link>
+                        <Link to="/legal-team" className="nav-link">Legal Team</Link>
+                    </div>
+                )}
+            </div>
             <div className="user-info">
                 <span>{user?.name || 'User'}</span>
                 <div className="user-avatar">{getInitials(user?.name)}</div>

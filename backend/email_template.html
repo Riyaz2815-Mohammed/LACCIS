@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LACCIS - Welcome</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #6B46C1 0%, #9333EA 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(107, 70, 193, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #6B46C1 0%, #9333EA 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .greeting {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        
+        .greeting strong {
+            color: #6B46C1;
+        }
+        
+        .welcome-text {
+            color: #555;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .credentials-box {
+            background: linear-gradient(135deg, #F3E8FF 0%, #EDE9FE 100%);
+            border-left: 4px solid #9333EA;
+            padding: 25px;
+            margin: 30px 0;
+            border-radius: 8px;
+        }
+        
+        .credentials-box h3 {
+            color: #6B46C1;
+            margin-bottom: 20px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .credential-item {
+            margin-bottom: 18px;
+        }
+        
+        .credential-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .credential-label {
+            font-size: 12px;
+            color: #7E57C2;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+        }
+        
+        .credential-value {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 16px;
+            color: #1F2937;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-weight: 500;
+            word-break: break-all;
+            border: 1px solid #E9D5FF;
+        }
+        
+        .password-value {
+            background: white;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 18px;
+            color: #9333EA;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-align: center;
+            border: 2px solid #9333EA;
+        }
+        
+        .login-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #6B46C1 0%, #9333EA 100%);
+            color: white;
+            padding: 14px 40px;
+            text-decoration: none;
+            border-radius: 8px;
+            margin: 30px 0;
+            font-weight: 600;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            font-size: 16px;
+        }
+        
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(147, 51, 234, 0.3);
+        }
+        
+        .button-container {
+            text-align: center;
+        }
+        
+        .instructions {
+            background: #F9FAFB;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #6B46C1;
+        }
+        
+        .instructions h4 {
+            color: #6B46C1;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .instructions ol {
+            margin-left: 20px;
+            color: #555;
+            font-size: 13px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .footer {
+            background: #F3E8FF;
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #6B46C1;
+            border-top: 1px solid #E9D5FF;
+        }
+        
+        .footer p {
+            margin-bottom: 8px;
+        }
+        
+        .security-note {
+            background: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 12px;
+            color: #92400E;
+        }
+        
+        .security-note strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>LACCIS</h1>
+            <p>Legal Clause Classification Intelligence System</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <div class="greeting">
+                Welcome, <strong>{CLIENT_NAME}</strong>!
+            </div>
+            
+            <div class="welcome-text">
+                Your LACCIS account has been successfully created. You now have access to our Legal Clause Classification Intelligence System. Use the credentials below to log in and start managing your documents.
+            </div>
+            
+            <!-- Credentials Box -->
+            <div class="credentials-box">
+                <h3>Your Login Credentials</h3>
+                
+                <div class="credential-item">
+                    <div class="credential-label">Email Address</div>
+                    <div class="credential-value">{CLIENT_EMAIL}</div>
+                </div>
+                
+                <div class="credential-item">
+                    <div class="credential-label">Password</div>
+                    <div class="password-value">{CLIENT_PASSWORD}</div>
+                </div>
+            </div>
+            
+            <!-- Security Note -->
+            <div class="security-note">
+                <strong>⚠️ Security Notice:</strong>
+                Please keep your password safe and do not share it with anyone. Change your password after your first login for added security.
+            </div>
+            
+            <!-- Instructions -->
+            <div class="instructions">
+                <h4>How to Get Started:</h4>
+                <ol>
+                    <li>Click the button below to log in to your account</li>
+                    <li>Enter your email and password</li>
+                    <li>Update your profile if needed</li>
+                    <li>Upload and manage your legal documents</li>
+                    <li>Review classified clauses and analysis</li>
+                </ol>
+            </div>
+            
+            <!-- Login Button -->
+            <div class="button-container">
+                <a href="https://laccis.com/login" class="login-button">Log In to LACCIS</a>
+            </div>
+            
+            <!-- Additional Info -->
+            <div style="color: #666; font-size: 13px; margin-top: 30px;">
+                <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+                <p>We're here to help you get the most out of LACCIS!</p>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2026 LACCIS. All rights reserved.</p>
+            <p>Legal Clause Classification Intelligence System</p>
+        </div>
+    </div>
+</body>
+</html>

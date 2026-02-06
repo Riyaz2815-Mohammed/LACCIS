@@ -4,14 +4,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 import secrets
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from datetime import datetime, timedelta
 import jwt
 import os
 import json
 from pathlib import Path
+from dotenv import load_dotenv
 
 app = FastAPI(title="LACCIS API", description="Legal Clause Classification Intelligence System")
 
@@ -34,17 +33,22 @@ DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 USERS_FILE = DATA_DIR / "users.json"
 CLIENTS_FILE = DATA_DIR / "clients.json"
+LEGAL_TEAM_FILE = DATA_DIR / "legal_team.json"
 DOCUMENTS_FILE = DATA_DIR / "documents.json"
 UPLOADS_DIR = DATA_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-# SMTP Configuration (update with your SMTP settings)
-# For Gmail: Generate App Password at https://myaccount.google.com/apppasswords
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USERNAME = "anvarbhashaj1ace@gmail.com"
-SMTP_PASSWORD = "fxmv kgwh jtgi nalf"  # Replace with Gmail App Password (NOT regular password)
-SMTP_FROM_EMAIL = "anvarbhashaj1ace@gmail.com"
+# Load environment variables                
+load_dotenv()
+EMAILJS_SERVICE_ID = os.getenv("EMAILJS_SERVICE_ID")
+EMAILJS_TEMPLATE_ID = os.getenv("EMAILJS_TEMPLATE_ID")
+EMAILJS_PUBLIC_KEY = os.getenv("EMAILJS_PUBLIC_KEY")
+EMAILJS_PRIVATE_KEY = os.getenv("EMAILJS_PRIVATE_KEY")
+
+# Debug: Print if credentials are loaded
+print(f"✓ EMAILJS_SERVICE_ID loaded: {bool(EMAILJS_SERVICE_ID)}")
+print(f"✓ EMAILJS_TEMPLATE_ID loaded: {bool(EMAILJS_TEMPLATE_ID)}")
+print(f"✓ EMAILJS_PUBLIC_KEY loaded: {bool(EMAILJS_PUBLIC_KEY)}")
 
 # Models
 class LoginRequest(BaseModel):
@@ -52,6 +56,14 @@ class LoginRequest(BaseModel):
     password: str
 
 class ClientCreate(BaseModel):
+    name: str
+    email: EmailStr
+
+class ClientCreate(BaseModel):
+    name: str
+    email: EmailStr
+
+class LegalTeamMemberCreate(BaseModel):
     name: str
     email: EmailStr
 
@@ -72,12 +84,12 @@ class DocumentShare(BaseModel):
 # Helper functions
 def load_json(file_path):
     if file_path.exists():
-        with open(file_path, 'r') as f:
+        with open(file_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return []
 
 def save_json(file_path, data):
-    with open(file_path, 'w') as f:
+    with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
 
 def create_token(user_id: str, email: str, role: str):
@@ -100,24 +112,81 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 def send_email(to_email: str, subject: str, body: str):
-    """Send email via SMTP"""
+    """
+    Send email via EmailJS REST API
+    
+    Args:
+        to_email: Recipient email address
+        subject: Email subject
+        body: Email body (HTML format)
+    
+    Returns:
+        dict: {'success': bool, 'message': str}
+    """
     try:
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_FROM_EMAIL
-        msg['To'] = to_email
-        msg['Subject'] = subject
+        # Check if EmailJS credentials are configured
+        if not all([EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY]):
+            error_msg = f"EmailJS credentials not configured. SERVICE_ID: {bool(EMAILJS_SERVICE_ID)}, TEMPLATE_ID: {bool(EMAILJS_TEMPLATE_ID)}, PUBLIC_KEY: {bool(EMAILJS_PUBLIC_KEY)}"
+            print(f"✗ {error_msg}")
+            return {
+                'success': False,
+                'message': error_msg
+            }
         
-        msg.attach(MIMEText(body, 'html'))
+        # EmailJS API endpoint
+        url = "https://api.emailjs.com/api/v1.0/email/send"
         
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        return True
+        # Prepare email data
+        email_data = {
+            "service_id": EMAILJS_SERVICE_ID,
+            "template_id": EMAILJS_TEMPLATE_ID,
+            "user_id": EMAILJS_PUBLIC_KEY,
+            "accessToken": EMAILJS_PRIVATE_KEY,  # Required for Strict Mode
+            "template_params": {
+                "to_email": to_email,
+                "subject": subject,
+                "html_content": body
+            }
+        }
+        
+        print(f"📤 Sending email to {to_email} via EmailJS...")
+        print(f"   Service: {EMAILJS_SERVICE_ID}")
+        print(f"   Template: {EMAILJS_TEMPLATE_ID}")
+        
+        # Send via EmailJS
+        response = requests.post(url, json=email_data, timeout=10)
+        
+        print(f"   Response Status: {response.status_code}")
+        print(f"   Response Body: {response.text}")
+        
+        if response.status_code == 200:
+            print(f"✓ Email sent successfully to {to_email}")
+            return {
+                'success': True,
+                'message': f'Email sent successfully to {to_email}'
+            }
+        else:
+            error_msg = f"EmailJS error: {response.status_code} - {response.text}"
+            print(f"✗ {error_msg}")
+            return {
+                'success': False,
+                'message': error_msg
+            }
+    
+    except requests.exceptions.Timeout:
+        error_msg = "EmailJS request timeout - check your internet connection"
+        print(f"✗ {error_msg}")
+        return {'success': False, 'message': error_msg}
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"EmailJS request error: {str(e)}"
+        print(f"✗ {error_msg}")
+        return {'success': False, 'message': error_msg}
+    
     except Exception as e:
-        print(f"Email error: {e}")
-        return False
+        error_msg = f"Email error: {str(e)}"
+        print(f"✗ {error_msg}")
+        return {'success': False, 'message': error_msg}
 
 # Initialize default admin user
 def init_default_users():
@@ -166,8 +235,9 @@ def create_client(client: ClientCreate, current_user: dict = Depends(verify_toke
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Only admins can create clients")
     
-    # Generate random password
-    password = secrets.token_urlsafe(12)
+    # Generate random password in format LACCIS-XXXXXX
+    random_suffix = secrets.token_hex(3).upper()  # 6 character hex string
+    password = f"LACCIS-{random_suffix}"
     
     # Create client user
     users = load_json(USERS_FILE)
@@ -202,23 +272,114 @@ def create_client(client: ClientCreate, current_user: dict = Depends(verify_toke
     clients.append(new_client)
     save_json(CLIENTS_FILE, clients)
     
+    # Load and customize email template
+    try:
+        template_path = Path("email_template.html")
+        with open(template_path, 'r', encoding='utf-8') as f:
+            email_body = f.read()
+        
+        # Replace placeholders
+        email_body = email_body.replace('{CLIENT_NAME}', client.name)
+        email_body = email_body.replace('{CLIENT_EMAIL}', client.email)
+        email_body = email_body.replace('{CLIENT_PASSWORD}', password)
+    except Exception as e:
+        print(f"Error loading template: {e}")
+        # Fallback to basic email
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
+                <h2 style="color: #6366f1;">Welcome to LACCIS</h2>
+                <p>Hello {client.name},</p>
+                <p>Your account has been created for the Legal Clause Classification Intelligence System.</p>
+                
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-top: 0;">Your Login Credentials:</h3>
+                    <p><strong>Email:</strong> {client.email}</p>
+                    <p><strong>Password:</strong> {password}</p>
+                </div>
+                
+                <p>You can now log in and upload your contract documents for analysis.</p>
+                <p><a href="http://localhost:5173" style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 10px;">Login to LACCIS</a></p>
+                
+                <p style="color: #666; font-size: 12px; margin-top: 30px;">Please keep your credentials secure and do not share them with anyone.</p>
+            </div>
+        </body>
+        </html>
+        """
+    
+    email_sent = send_email(client.email, "Your LACCIS Login Credentials", email_body)
+    
+    return {
+        "message": "Client created successfully",
+        "client": new_client,
+        "email_sent": email_sent['success'],
+        "email_message": email_sent['message'],
+        "credentials": {
+            "email": client.email,
+            "password": password
+        }
+    }
+
+
+@app.post("/api/legal/create")
+def create_legal_team_member(member: LegalTeamMemberCreate, current_user: dict = Depends(verify_token)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can create legal team members")
+    
+    # Generate random password
+    password = secrets.token_urlsafe(12)
+    
+    # Create legal team user
+    users = load_json(USERS_FILE)
+    legal_team = load_json(LEGAL_TEAM_FILE)
+    
+    # Check if email already exists
+    if any(u["email"] == member.email for u in users):
+        raise HTTPException(status_code=400, detail="Email already exists")
+    
+    member_id = f"legal-{len(legal_team) + 1}"
+    
+    new_user = {
+        "id": member_id,
+        "name": member.name,
+        "email": member.email,
+        "password": password,
+        "role": "legal_team",
+        "created_at": datetime.now().isoformat()
+    }
+    
+    users.append(new_user)
+    save_json(USERS_FILE, users)
+    
+    # Save legal team info
+    new_member = {
+        "id": member_id,
+        "name": member.name,
+        "email": member.email,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    legal_team.append(new_member)
+    save_json(LEGAL_TEAM_FILE, legal_team)
+    
     # Send email with credentials
     email_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
         <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px;">
-            <h2 style="color: #6366f1;">Welcome to LACCIS</h2>
-            <p>Hello {client.name},</p>
+            <h2 style="color: #6366f1;">Welcome to LACCIS Legal Team</h2>
+            <p>Hello {member.name},</p>
             <p>Your account has been created for the Legal Clause Classification Intelligence System.</p>
             
             <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <h3 style="margin-top: 0;">Your Login Credentials:</h3>
-                <p><strong>Email:</strong> {client.email}</p>
+                <p><strong>Email:</strong> {member.email}</p>
                 <p><strong>Password:</strong> {password}</p>
             </div>
             
-            <p>You can now log in and upload your contract documents for analysis.</p>
-            <p><a href="http://localhost:8000" style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 10px;">Login to LACCIS</a></p>
+            <p>You can now log in to review contracts.</p>
+            <p><a href="http://localhost:5173" style="background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin-top: 10px;">Login to LACCIS</a></p>
             
             <p style="color: #666; font-size: 12px; margin-top: 30px;">Please keep your credentials secure and do not share them with anyone.</p>
         </div>
@@ -226,16 +387,51 @@ def create_client(client: ClientCreate, current_user: dict = Depends(verify_toke
     </html>
     """
     
-    email_sent = send_email(client.email, "Your LACCIS Login Credentials", email_body)
+    email_sent = send_email(member.email, "LACCIS Legal Team Account", email_body)
     
     return {
-        "message": "Client created successfully",
-        "client": new_client,
+        "message": "Legal team member created successfully",
+        "member": new_member,
         "email_sent": email_sent,
         "credentials": {
-            "email": client.email,
+            "email": member.email,
             "password": password
         }
+    }
+
+@app.get("/api/legal/list")
+def list_legal_team(current_user: dict = Depends(verify_token)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can view legal team members")
+    
+    legal_team = load_json(LEGAL_TEAM_FILE)
+    return {"members": legal_team}
+
+@app.delete("/api/legal/delete/{member_id}")
+def delete_legal_team_member(member_id: str, current_user: dict = Depends(verify_token)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can delete legal team members")
+    
+    # Load data
+    legal_team = load_json(LEGAL_TEAM_FILE)
+    users = load_json(USERS_FILE)
+    
+    # Find member
+    member = next((m for m in legal_team if m["id"] == member_id), None)
+    if not member:
+        raise HTTPException(status_code=404, detail="Legal team member not found")
+    
+    # Remove from legal team list
+    legal_team = [m for m in legal_team if m["id"] != member_id]
+    save_json(LEGAL_TEAM_FILE, legal_team)
+    
+    # Remove user account
+    users = [u for u in users if u["id"] != member_id]
+    save_json(USERS_FILE, users)
+    
+    return {
+        "message": "Legal team member deleted successfully",
+        "member": member
     }
 
 @app.get("/api/clients/list")
@@ -400,7 +596,10 @@ def share_document(
         """
         send_email(recipient["email"], "Document Shared - LACCIS", email_body)
     
-    return {"message": "Document shared successfully", "document": doc}
+    return {
+        "message": "Document shared successfully",
+        "document": doc
+    }
 
 @app.post("/api/documents/approve/{document_id}")
 def approve_document(
@@ -437,9 +636,13 @@ def approve_document(
                 </body>
                 </html>
                 """
-                send_email(client["email"], f"{doc['document_type']} Approved - LACCIS", email_body)
+                result = send_email(client["email"], f"{doc['document_type']} Approved - LACCIS", email_body)
+                print(f"Approval email result: {result}")
             
-            return {"message": "Document approved successfully", "document": documents[i]}
+            return {
+                "message": "Document approved successfully",
+                "document": documents[i]
+            }
     
     raise HTTPException(status_code=404, detail="Document not found")
 
