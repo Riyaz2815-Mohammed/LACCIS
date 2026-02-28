@@ -111,26 +111,31 @@ def extract_text_from_file(local_path: str) -> str:
     extracted_text = ""
 
     if ext == ".pdf":
+        import fitz  # PyMuPDF
         text_content = ""
         pages_with_text = 0
         total_pages = 0
         
-        with pdfplumber.open(local_path) as pdf:
-            total_pages = len(pdf.pages)
-            for page_number, page in enumerate(pdf.pages, start=1):
-                page_text = page.extract_text()
-                if page_text and len(page_text.strip()) > 20: # Threshold for "real" text
-                    pages_with_text += 1
-                    text_content += page_text + " "
-                    extracted_text += f"PAGE {page_number}\n"
-                    extracted_text += "-" * 20 + "\n"
-                    extracted_text += page_text + "\n\n"
+        try:
+            with fitz.open(local_path) as pdf:
+                total_pages = len(pdf)
+                for page_number in range(total_pages):
+                    page = pdf[page_number]
+                    page_text = page.get_text()
+                    
+                    if page_text and len(page_text.strip()) > 20: # Threshold for "real" text
+                        pages_with_text += 1
+                        text_content += page_text + " "
+                        extracted_text += f"PAGE {page_number + 1}\n"
+                        extracted_text += "-" * 20 + "\n"
+                        extracted_text += page_text + "\n\n"
+        except Exception as e:
+            print(f"❌ PyMuPDF Error reading {local_path}: {e}")
+            return ""
         
         # heuristic: if even one page is missing text, treat it as a potential mixed/scanned doc
         is_scanned = False
         if total_pages > 0:
-            # If any page is "empty" but the document has pages, we might need OCR
-            # Or if the overall text content is extremely low for the page count
             if pages_with_text < total_pages or len(text_content.strip()) < (total_pages * 50):
                 is_scanned = True
         

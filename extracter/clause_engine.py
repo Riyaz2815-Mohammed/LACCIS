@@ -22,8 +22,6 @@ def extract_structural_id(text: str) -> Optional[str]:
         r"^(Article\s+\d+(\.\d+)*)",     # Article 1
         r"^(\d+(\.\d+)+)",               # 1.1, 1.1.1 (multi-part)
         r"^(\d+\.)",                     # 1. (simple)
-        r"^(\([a-zA-Z0-9]+\))",          # (a), (1)
-        r"^([a-zA-Z]\.)",                # a. , b.
         r"^([0-9]+\s+[A-Z][a-z]+)",      # 1 Indemnity (no period)
         r"^([IVXLCDM]+\.)",              # Roman numerals I., IV.
     ]
@@ -36,6 +34,76 @@ def extract_structural_id(text: str) -> Optional[str]:
     return None
 
 
+HEADER_LOGIC = {
+    "Definitions": [r"definitions", r"defined terms"],
+    "Purpose": [r"purpose", r"background", r"recitals"],
+    "Purpose of the Agreement": [r"purpose of the agreement", r"objective"],
+    "Scope of Services": [r"scope of services", r"service scope"],
+    "Scope of Referral Services": [r"scope of referral services"],
+    "Structure of Agreement (MSA–SOW Linkage)": [r"structure of agreement", r"msa–sow linkage", r"linkage between msa and sow"],
+    "Appointment of Referrer": [r"appointment of referrer", r"designation of referrer"],
+    "Referrer’s Responsibilities": [r"referrer.*responsibilit", r"responsibilities of referrer"],
+    "Solution Provider’s Responsibilities": [r"solution provider.*responsibilit", r"responsibilities of solution provider"],
+    "Roles and Responsibilities": [r"roles and responsibilit", r"obligations of the parties"],
+    "Deliverables": [r"deliverables", r"work product deliverables"],
+    "Project Timeline and Milestones": [r"project timeline", r"milestones", r"schedule"],
+    "Assumptions and Dependencies": [r"assumptions and dependencies"],
+    "Acceptance Criteria": [r"acceptance criteria", r"testing and acceptance"],
+    "Service Levels (SLA)": [r"service level", r"sla", r"uptime", r"availability"],
+    "Change Management Process": [r"change management", r"change request", r"change control"],
+    "Fees and Payment Terms": [r"fees and payment", r"payment terms", r"compensation"],
+    "Referral Fee": [r"referral fee", r"referral commission"],
+    "Commission Structure": [r"commission structure", r"payment of commission"],
+    "Payment Schedule": [r"payment schedule", r"milestone payments"],
+    "Invoicing Terms": [r"invoicing", r"invoice terms"],
+    "Taxes and Tax Responsibility": [r"taxes", r"tax responsibility", r"withholding"],
+    "Expenses": [r"expenses", r"reimbursement of expenses"],
+    "No Expense Reimbursement": [r"no expense reimbursement"],
+    "Confidentiality": [r"confidentiality", r"non-disclosure"],
+    "Definition of Confidential Information": [r"definition of confidential information"],
+    "Exclusions from Confidential Information": [r"exclusions from confidential information", r"exceptions to confidentiality"],
+    "Permitted Use of Confidential Information": [r"permitted use of confidential information"],
+    "Non-Disclosure and Non-Use Obligations": [r"non-disclosure and non-use", r"confidentiality obligations"],
+    "Return or Destruction of Confidential Information": [r"return or destruction"],
+    "Confidentiality and IP Protection": [r"confidentiality and ip protection"],
+    "Intellectual Property Rights": [r"intellectual property rights", r"ip rights", r"proprietary rights"],
+    "Ownership of Deliverables": [r"ownership of deliverables", r"title to deliverables"],
+    "No License Granted": [r"no license granted", r"no transfer of rights"],
+    "Data Protection and Security": [r"data protection", r"data security", r"gdpr", r"privacy"],
+    "Compliance with Laws": [r"compliance with laws", r"regulatory compliance"],
+    "Independent Contractor Relationship": [r"independent contractor", r"relationship of the parties"],
+    "Non-Solicitation": [r"non-solicitation", r"non solicitation"],
+    "Non-Circumvention": [r"non-circumvention", r"non circumvention"],
+    "Exclusivity / Non-Exclusivity": [r"exclusivity", r"non-exclusivity"],
+    "Representations and Warranties": [r"representations and warranties"],
+    "Warranty of Services": [r"warranty of services", r"service warranty"],
+    "Indemnification": [r"indemnification", r"indemnity"],
+    "Insurance": [r"insurance", r"liability insurance"],
+    "Limitation of Liability": [r"limitation of liability", r"liability limit"],
+    "Risk Allocation": [r"risk allocation", r"allocation of risk"],
+    "Remedies for Breach": [r"remedies for breach", r"liquidated damages"],
+    "Injunctive Relief": [r"injunctive relief", r"equitable relief"],
+    "Channel Conflict Resolution": [r"channel conflict"],
+    "Force Majeure": [r"force majeure", r"act of god"],
+    "Term": [r"term", r"duration of agreement"],
+    "Termination": [r"termination"],
+    "Termination for Convenience": [r"termination for convenience", r"voluntary termination"],
+    "Termination for Cause": [r"termination for cause", r"default termination"],
+    "Effect of Termination": [r"effect of termination", r"consequences of termination"],
+    "Transition Assistance": [r"transition assistance", r"exit services"],
+    "Survival": [r"survival"],
+    "Assignment": [r"assignment", r"transfer of agreement"],
+    "Subcontracting": [r"subcontracting"],
+    "Amendments": [r"amendments", r"modifications"],
+    "Notices": [r"notices", r"communications"],
+    "Severability": [r"severability"],
+    "Waiver": [r"waiver", r"no waiver"],
+    "Entire Agreement": [r"entire agreement", r"integration", r"merger"],
+    "General": [r"general", r"miscellaneous"],
+    "Governing Law": [r"governing law", r"applicable law"],
+    "Jurisdiction and Dispute Resolution": [r"jurisdiction", r"dispute resolution", r"arbitration", r"mediation"],
+}
+
 def classify_clause(text: str) -> str:
     """
     Classifies the clause text into a standardized type using rules, headers, and keywords.
@@ -45,79 +113,9 @@ def classify_clause(text: str) -> str:
     text_lower = text_clean.lower()
     
     # Priority 1: Check if the text starts with a specific section header (prefix matching)
-    header_logic = {
-        "Definitions": [r"definitions", r"defined terms"],
-        "Purpose": [r"purpose", r"background", r"recitals"],
-        "Purpose of the Agreement": [r"purpose of the agreement", r"objective"],
-        "Scope of Services": [r"scope of services", r"service scope"],
-        "Scope of Referral Services": [r"scope of referral services"],
-        "Structure of Agreement (MSA–SOW Linkage)": [r"structure of agreement", r"msa–sow linkage", r"linkage between msa and sow"],
-        "Appointment of Referrer": [r"appointment of referrer", r"designation of referrer"],
-        "Referrer’s Responsibilities": [r"referrer.*responsibilit", r"responsibilities of referrer"],
-        "Solution Provider’s Responsibilities": [r"solution provider.*responsibilit", r"responsibilities of solution provider"],
-        "Roles and Responsibilities": [r"roles and responsibilit", r"obligations of the parties"],
-        "Deliverables": [r"deliverables", r"work product deliverables"],
-        "Project Timeline and Milestones": [r"project timeline", r"milestones", r"schedule"],
-        "Assumptions and Dependencies": [r"assumptions and dependencies"],
-        "Acceptance Criteria": [r"acceptance criteria", r"testing and acceptance"],
-        "Service Levels (SLA)": [r"service level", r"sla", r"uptime", r"availability"],
-        "Change Management Process": [r"change management", r"change request", r"change control"],
-        "Fees and Payment Terms": [r"fees and payment", r"payment terms", r"compensation"],
-        "Referral Fee": [r"referral fee", r"referral commission"],
-        "Commission Structure": [r"commission structure", r"payment of commission"],
-        "Payment Schedule": [r"payment schedule", r"milestone payments"],
-        "Invoicing Terms": [r"invoicing", r"invoice terms"],
-        "Taxes and Tax Responsibility": [r"taxes", r"tax responsibility", r"withholding"],
-        "Expenses": [r"expenses", r"reimbursement of expenses"],
-        "No Expense Reimbursement": [r"no expense reimbursement"],
-        "Confidentiality": [r"confidentiality", r"non-disclosure"],
-        "Definition of Confidential Information": [r"definition of confidential information"],
-        "Exclusions from Confidential Information": [r"exclusions from confidential information", r"exceptions to confidentiality"],
-        "Permitted Use of Confidential Information": [r"permitted use of confidential information"],
-        "Non-Disclosure and Non-Use Obligations": [r"non-disclosure and non-use", r"confidentiality obligations"],
-        "Return or Destruction of Confidential Information": [r"return or destruction"],
-        "Confidentiality and IP Protection": [r"confidentiality and ip protection"],
-        "Intellectual Property Rights": [r"intellectual property rights", r"ip rights", r"proprietary rights"],
-        "Ownership of Deliverables": [r"ownership of deliverables", r"title to deliverables"],
-        "No License Granted": [r"no license granted", r"no transfer of rights"],
-        "Data Protection and Security": [r"data protection", r"data security", r"gdpr", r"privacy"],
-        "Compliance with Laws": [r"compliance with laws", r"regulatory compliance"],
-        "Independent Contractor Relationship": [r"independent contractor", r"relationship of the parties"],
-        "Non-Solicitation": [r"non-solicitation", r"non solicitation"],
-        "Non-Circumvention": [r"non-circumvention", r"non circumvention"],
-        "Exclusivity / Non-Exclusivity": [r"exclusivity", r"non-exclusivity"],
-        "Representations and Warranties": [r"representations and warranties"],
-        "Warranty of Services": [r"warranty of services", r"service warranty"],
-        "Indemnification": [r"indemnification", r"indemnity"],
-        "Insurance": [r"insurance", r"liability insurance"],
-        "Limitation of Liability": [r"limitation of liability", r"liability limit"],
-        "Risk Allocation": [r"risk allocation", r"allocation of risk"],
-        "Remedies for Breach": [r"remedies for breach", r"liquidated damages"],
-        "Injunctive Relief": [r"injunctive relief", r"equitable relief"],
-        "Channel Conflict Resolution": [r"channel conflict"],
-        "Force Majeure": [r"force majeure", r"act of god"],
-        "Term": [r"term", r"duration of agreement"],
-        "Termination": [r"termination"],
-        "Termination for Convenience": [r"termination for convenience", r"voluntary termination"],
-        "Termination for Cause": [r"termination for cause", r"default termination"],
-        "Effect of Termination": [r"effect of termination", r"consequences of termination"],
-        "Transition Assistance": [r"transition assistance", r"exit services"],
-        "Survival": [r"survival"],
-        "Assignment": [r"assignment", r"transfer of agreement"],
-        "Subcontracting": [r"subcontracting"],
-        "Amendments": [r"amendments", r"modifications"],
-        "Notices": [r"notices", r"communications"],
-        "Severability": [r"severability"],
-        "Waiver": [r"waiver", r"no waiver"],
-        "Entire Agreement": [r"entire agreement", r"integration", r"merger"],
-        "General": [r"general", r"miscellaneous"],
-        "Governing Law": [r"governing law", r"applicable law"],
-        "Jurisdiction and Dispute Resolution": [r"jurisdiction", r"dispute resolution", r"arbitration", r"mediation"],
-    }
-
     # Check first 70 chars for headers
     prefix = text_lower[:70]
-    for category, patterns in header_logic.items():
+    for category, patterns in HEADER_LOGIC.items():
         for pat in patterns:
             if re.search(pat, prefix):
                 return category
@@ -197,7 +195,20 @@ def parse_text_file(file_path: str) -> List[Dict[str, Any]]:
             continue
 
         # Check if line starts a new clause
-        is_new_clause = extract_structural_id(line_stripped) is not None
+        has_id = extract_structural_id(line_stripped) is not None
+        
+        is_unnumbered_heading = False
+        if not has_id and len(line_stripped) < 80:
+            lower_line = line_stripped.lower()
+            if line_stripped.isupper() and any(c.isalpha() for c in line_stripped):
+                is_unnumbered_heading = True
+            else:
+                for cats, pats in HEADER_LOGIC.items():
+                    if any(re.match(p, lower_line) for p in pats):
+                        is_unnumbered_heading = True
+                        break
+
+        is_new_clause = has_id or is_unnumbered_heading
 
         if is_new_clause:
             # Save previous block if exists
