@@ -248,36 +248,42 @@ def process_document(
 ) -> List[Dict[str, Any]]:
     """
     Process extracted text blocks and return structured data.
-
-    Each record contains:
-      - clause_id   : unique UUID for this clause record (e.g. CLZ-XXXXXXXX)
-      - clause      : classified clause type (e.g. "Confidentiality")
-      - content_id  : unique UUID for the raw content block (e.g. CNT-XXXXXXXX)
-      - content     : raw text of the clause block
-      - page_number : page number where the clause starts
-      - document    : document type (e.g. "NDA", "MSA", "SOW")
-      - source      : who uploaded it — "client" or "legal"
+    Aggregates all blocks belonging to the same clause category into a single entry per document.
     """
-    structured_records = []
+    clause_groups = {}
 
     for block in extracted_blocks:
         raw_text = block.get("raw_text", "").strip()
+        if not raw_text:
+            continue
+            
         page_num = block.get("page_number")
-
-        clause_id  = f"CLZ-{uuid.uuid4().hex[:8].upper()}"
-        content_id = f"CNT-{uuid.uuid4().hex[:8].upper()}"
         clause_type = classify_clause(raw_text)
 
-        record = {
-            "clause_id":   clause_id,
-            "clause":      clause_type,
-            "content_id":  content_id,
-            "content":     raw_text,
-            "page_number": page_num,
-            "document":    document,
-            "source":      source,
-        }
+        if clause_type not in clause_groups:
+            clause_groups[clause_type] = {
+                "clause_id":   f"CLZ-{uuid.uuid4().hex[:8].upper()}",
+                "clause":      clause_type,
+                "content_id":  f"CNT-{uuid.uuid4().hex[:8].upper()}",
+                "content":     [raw_text],
+                "page_number": page_num, # Store earliest page
+                "document":    document,
+                "source":      source,
+            }
+        else:
+            # Append text to existing clause group
+            clause_groups[clause_type]["content"].append(raw_text)
+            
+            # Keep the earliest page number reference
+            current_page = clause_groups[clause_type]["page_number"]
+            if page_num is not None:
+                if current_page is None or page_num < current_page:
+                    clause_groups[clause_type]["page_number"] = page_num
 
-        structured_records.append(record)
+    # Flatten the lists back into single text strings
+    structured_records = []
+    for ct, data in clause_groups.items():
+        data["content"] = "\n\n".join(data["content"])
+        structured_records.append(data)
 
     return structured_records
