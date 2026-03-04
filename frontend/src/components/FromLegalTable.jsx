@@ -101,39 +101,68 @@ function FromLegalTable({ contracts, loading, onAccept }) {
             {tableHead}
             <tbody>
                 {contracts.map((contract) => {
-                    const { cls, text } = getStatusBadge(contract.status);
+                    const status = contract.status === 'pending_review' ? 'Pending Approval' :
+                        contract.status === 'accepted' ? 'Approved' :
+                            contract.status === 'rejected' ? 'Rejected' : contract.status;
+
+                    const getStatusStyles = (s) => {
+                        if (s === 'Pending Approval') return { background: '#FEF3C7', color: '#D97706' };
+                        if (s === 'Approved') return { background: '#D1FAE5', color: '#059669' };
+                        if (s === 'Rejected') return { background: '#FEE2E2', color: '#DC2626' };
+                        return { background: '#F3F4F6', color: '#6B7280' };
+                    };
+
+                    const statusStyle = getStatusStyles(status);
+
                     return (
                         <tr key={contract.id}>
                             <td className="fl-filename">{contract.filename}</td>
                             <td>
                                 <span className="fl-type-badge">
-                                    {contract.document_type || 'PDF'}
+                                    {contract.document_type || 'NDA'}
                                 </span>
                             </td>
                             <td>{new Date(contract.shared_at).toLocaleDateString()}</td>
                             <td>
-                                <span className={`badge ${cls}`}>{text}</span>
+                                <span className="custom-status-badge" style={statusStyle}>
+                                    {status}
+                                </span>
                             </td>
                             <td>{formatFileSize(contract.size)}</td>
                             <td>
-                                <div className="fl-actions">
-                                    <button
-                                        className="btn-action btn-download"
-                                        onClick={() => handleDownload(contract.id)}
-                                        title="Download Contract"
-                                    >
-                                        ⬇ Download
-                                    </button>
-                                    {contract.status === 'pending_review' && (
+                                <div className="fl-actions-container">
+                                    <div className="icon-actions-group">
                                         <button
-                                            className="btn-action btn-approve"
-                                            onClick={() => onAccept && onAccept(contract.id)}
-                                            style={{ backgroundColor: '#10b981' }}
-                                            title="Accept Contract"
+                                            className={`icon-btn btn-check ${contract.status !== 'pending_review' ? 'disabled' : ''}`}
+                                            onClick={() => contract.status === 'pending_review' && onAccept && onAccept(contract.id)}
+                                            title="Accept"
+                                            disabled={contract.status !== 'pending_review'}
                                         >
-                                            ✅ Accept
+                                            <span className="icon">✓</span>
                                         </button>
-                                    )}
+                                        <button
+                                            className={`icon-btn btn-cross ${contract.status !== 'pending_review' ? 'disabled' : ''}`}
+                                            onClick={() => contract.status === 'pending_review' && onReject && onReject(contract.id)}
+                                            title="Reject"
+                                            disabled={contract.status !== 'pending_review'}
+                                        >
+                                            <span className="icon">✕</span>
+                                        </button>
+                                        <button
+                                            className="icon-btn btn-down"
+                                            onClick={() => handleDownload(contract.id)}
+                                            title="Download"
+                                        >
+                                            <span className="icon">↓</span>
+                                        </button>
+                                    </div>
+                                    <button
+                                        className="btn-review-outline"
+                                        onClick={() => window.location.href = `/workspace/review/${contract.id}`}
+                                        title="Review"
+                                    >
+                                        <span className="icon">🔍</span> Review
+                                    </button>
                                 </div>
                             </td>
                         </tr>

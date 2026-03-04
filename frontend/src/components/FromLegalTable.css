@@ -46,3 +46,95 @@
     align-items: center;
     gap: 0.35rem;
 }
+
+.custom-status-badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.fl-actions-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.icon-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    padding: 0;
+}
+
+.icon-btn:hover:not(.disabled) {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.icon-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f1f5f9;
+}
+
+.btn-check {
+    color: #ffffff;
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+.btn-check:hover:not(.disabled) {
+    background-color: #059669;
+    border-color: #059669;
+}
+
+.btn-cross {
+    color: #ef4444;
+}
+
+.btn-down {
+    color: #475569;
+}
+
+.btn-review-outline {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.85rem;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-review-outline:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

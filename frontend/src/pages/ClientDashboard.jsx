@@ -132,9 +132,27 @@ function ClientDashboard({ user, onLogout }) {
             if (res.ok) {
                 loadSharedContracts();
                 loadActivities();
+                // Optionally reload user to get updated nda_accepted status
+                loadDocuments();
             }
         } catch (err) {
             console.error('Accept contract error:', err);
+        }
+    };
+
+    const handleRejectContract = async (contractId) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_URL}/api/contracts/reject/${contractId}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                loadSharedContracts();
+                loadActivities();
+            }
+        } catch (err) {
+            console.error('Reject contract error:', err);
         }
     };
 
@@ -199,6 +217,7 @@ function ClientDashboard({ user, onLogout }) {
                                         contracts={sharedContracts}
                                         loading={sharedLoading}
                                         onAccept={handleAcceptContract}
+                                        onReject={handleRejectContract}
                                     />
                                 </div>
                             </div>

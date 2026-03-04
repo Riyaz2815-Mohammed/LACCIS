@@ -267,25 +267,49 @@ def login(request: LoginRequest):
     try:
         conn = db_pool.getconn()
         with conn.cursor() as cur:
-            cur.execute("SELECT id, email, name, role, password_hash FROM users WHERE email = %s", (request.email,))
+            cur.execute("SELECT id, email, name, role, password_hash, nda_accepted FROM users WHERE email = %s", (request.email,))
             user_row = cur.fetchone()
             
         if not user_row:
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
-        user_id, email, name, role, password_hash = user_row
+        user_id, email, name, role, password_hash, nda_accepted = user_row
         
         # Direct password comparison
         if password_hash == request.password:
             token = create_token(user_id, email, role)
             record_activity(user_id, user_id, "Logged in")
+            
+            # If client and NDA not accepted, auto-share if not already shared
+            if role == 'client' and not nda_accepted:
+                with conn.cursor() as cur:
+                    # Check if already shared
+                    cur.execute("SELECT 1 FROM shared_contracts WHERE client_id = %s AND (filename ILIKE '%NDA%' OR document_type = 'template')", (user_id,))
+                    if not cur.fetchone():
+                        # Find the latest NDA template
+                        cur.execute("SELECT id, filename, s3_key, file_path, size FROM documents WHERE document_type = 'template' AND (filename ILIKE '%NDA%' OR template_type = 'NDA') ORDER BY uploaded_at DESC LIMIT 1")
+                        template = cur.fetchone()
+                        if template:
+                            tmpl_id, tmpl_filename, tmpl_s3_key, tmpl_file_path, tmpl_size = template
+                            sc_id = f"sc-{uuid.uuid4().hex[:8]}"
+                            cur.execute(
+                                """
+                                INSERT INTO shared_contracts (id, filename, document_type, client_id, shared_by, shared_by_email, message, size, status, shared_at, s3_key, file_path)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """,
+                                (sc_id, tmpl_filename, 'NDA', user_id, 'admin-1', 'admin@laccis.com', 'Standard NDA for your review', tmpl_size, 'pending_review', datetime.now(), tmpl_s3_key, tmpl_file_path)
+                            )
+                            conn.commit()
+                            record_activity('admin-1', user_id, "Auto-shared NDA", tmpl_filename)
+
             return {
                 "token": token,
                 "user": {
                     "id": user_id,
                     "name": name,
                     "email": email,
-                    "role": role
+                    "role": role,
+                    "nda_accepted": nda_accepted
                 }
             }
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -1265,9 +1289,28 @@ def accept_shared_contract(contract_id: str, current_user: dict = Depends(verify
             cur.execute("UPDATE shared_contracts SET status = 'accepted', accepted_at = %s WHERE id = %s AND client_id = %s RETURNING filename", (datetime.now(), contract_id, current_user["user_id"]))
             row = cur.fetchone()
             if row:
+                filename = row[0]
+                # If it's an NDA, update user profile
+                if "NDA" in filename.upper():
+                    cur.execute("UPDATE users SET nda_accepted = TRUE, nda_accepted_at = %s WHERE id = %s", (datetime.now(), current_user["user_id"]))
+                
                 conn.commit()
-                record_activity(current_user["user_id"], current_user["user_id"], "Accepted contract", row[0])
+                record_activity(current_user["user_id"], current_user["user_id"], "Accepted contract", filename)
                 return {"message": "Accepted"}
+            raise HTTPException(status_code=404)
+    finally: db_pool.putconn(conn)
+
+@app.post("/api/contracts/reject/{contract_id}")
+def reject_shared_contract(contract_id: str, current_user: dict = Depends(verify_token)):
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE shared_contracts SET status = 'rejected' WHERE id = %s AND client_id = %s RETURNING filename", (contract_id, current_user["user_id"]))
+            row = cur.fetchone()
+            if row:
+                conn.commit()
+                record_activity(current_user["user_id"], current_user["user_id"], "Rejected contract", row[0])
+                return {"message": "Rejected"}
             raise HTTPException(status_code=404)
     finally: db_pool.putconn(conn)
 
