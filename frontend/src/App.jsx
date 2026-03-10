@@ -10,6 +10,7 @@ import TemplatesPage from './pages/TemplatesPage';
 import DocumentAnalysis from './pages/DocumentAnalysis';
 import TemplateAnalysis from './pages/TemplateAnalysis';
 import ClauseReview from './pages/ClauseReview';
+import RedlineReview from './pages/RedlineReview';
 import './App.css';
 
 
@@ -120,8 +121,16 @@ function App() {
           <Route
             path="/review/:documentId"
             element={
-              isAuthenticated ?
+              isAuthenticated && (user?.role === 'admin' || user?.role === 'legal_team') ?
                 <ClauseReview user={user} onLogout={handleLogout} /> :
+                <Navigate to="/login" />
+            }
+          />
+          <Route
+            path="/redline-review/:documentId"
+            element={
+              isAuthenticated && (user?.role === 'admin' || user?.role === 'legal_team') ?
+                <RedlineReview user={user} onLogout={handleLogout} /> :
                 <Navigate to="/login" />
             }
           />

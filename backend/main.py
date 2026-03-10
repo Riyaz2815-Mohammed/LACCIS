@@ -25,6 +25,13 @@ from botocore.exceptions import ClientError
 from botocore.config import Config
 import psycopg2
 from psycopg2 import pool
+import mammoth
+from docx import Document
+from pdf2docx import Converter
+from html2docx import html2docx
+import io
+import shutil
+import tempfile
 
 app = FastAPI(title="LACCIS API", description="Legal Clause Classification Intelligence System")
 
@@ -938,7 +945,7 @@ async def upload_document(
     # Trigger automated extraction in background (Skip for Redlined)
     source = "client" if current_user["role"] == "client" else "legal"
     if s3_url:
-        is_redlined = "Redlined" in document_type or "(Redlined)" in document_type
+        is_redlined = document_type == 'Redlined' or "Redlined" in document_type or "(Redlined)" in document_type
         if is_redlined:
             print(f"📄 [SKIP] Extraction skipped for redlined document: {file_name}")
         else:
@@ -948,6 +955,20 @@ async def upload_document(
         "message": "Document uploaded and queued for extraction",
         "document": new_doc
     }
+
+
+@app.get("/api/documents/download-file")
+def download_file_by_key(s3_key: str, current_user: dict = Depends(verify_token)):
+    """Helper to download any file from S3 by key."""
+    local_path = UPLOADS_DIR / s3_key
+    if not local_path.exists():
+        try:
+            s3_client.download_file(BUCKET_NAME, s3_key, str(local_path))
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"File not found in S3: {str(e)}")
+    
+    from fastapi.responses import FileResponse
+    return FileResponse(path=local_path, filename=s3_key.split('_', 1)[-1] if '_' in s3_key else s3_key)
 
 
 @app.get("/api/documents/analysis/{document_id}")
@@ -2217,6 +2238,195 @@ def document_chat(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Chat Agent error: {str(e)}")
 
+
+
+def docx_to_html(docx_path):
+    """Converts DOCX to HTML while preserving basic formatting (colors, bold, italic, underline)."""
+    try:
+        doc = Document(docx_path)
+        html = []
+        for para in doc.paragraphs:
+            p_html = ["<p>"]
+            for run in para.runs:
+                style = []
+                if run.font.color and run.font.color.rgb:
+                    style.append(f"color: #{run.font.color.rgb}")
+                if run.bold:
+                    style.append("font-weight: bold")
+                if run.italic:
+                    style.append("font-style: italic")
+                if run.underline:
+                    style.append("text-decoration: underline")
+                
+                text = run.text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                if style:
+                    p_html.append(f'<span style="{"; ".join(style)}">{text}</span>')
+                else:
+                    p_html.append(text)
+            p_html.append("</p>")
+            html.append("".join(p_html))
+        
+        # If document is empty or had no paragraphs, use mammoth as fallback
+        if not html:
+            with open(docx_path, "rb") as docx_file:
+                result = mammoth.convert_to_html(docx_file)
+                return result.value
+                
+        return "\n".join(html)
+    except Exception as e:
+        print(f"[ERROR] Custom docx_to_html failed: {e}")
+        # Fallback to mammoth
+        with open(docx_path, "rb") as docx_file:
+            result = mammoth.convert_to_html(docx_file)
+            return result.value
+
+@app.get("/api/documents/redline-content/{document_id}")
+def get_redline_content(document_id: str, current_user: dict = Depends(verify_token)):
+    """Convert DOCX/PDF to HTML for the rich text editor."""
+    if not db_pool:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT filename, s3_key, document_type FROM documents WHERE id = %s", (document_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Document not found")
+            
+            filename, s3_key, doc_type = row
+            
+            # Use local path if exists, else download from S3
+            local_path = UPLOADS_DIR / s3_key
+            if not local_path.exists():
+                s3_client.download_file(BUCKET_NAME, s3_key, str(local_path))
+            
+            html_content = ""
+            
+            if s3_key.lower().endswith('.docx'):
+                html_content = docx_to_html(local_path)
+            elif s3_key.lower().endswith('.pdf'):
+                # Convert PDF to DOCX first, then to HTML
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    docx_temp_path = os.path.join(temp_dir, "temp.docx")
+                    cv = Converter(str(local_path))
+                    cv.convert(docx_temp_path, start=0, end=None)
+                    cv.close()
+                    html_content = docx_to_html(docx_temp_path)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported file format for redline review")
+            
+            return {"html_content": html_content, "filename": filename}
+    except Exception as e:
+        print(f"[ERROR] Redline content conversion error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: db_pool.putconn(conn)
+
+@app.get("/api/legal/standard-clauses")
+def get_standard_clauses(current_user: dict = Depends(verify_token)):
+    """Fetch all standard legal clauses."""
+    if not db_pool:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT clause_id, clause, content FROM clauses WHERE source ILIKE %s ORDER BY clause", ('%legal%',))
+            rows = cur.fetchall()
+            clauses = [{"id": r[0], "type": r[1], "content": r[2]} for r in rows]
+            return {"clauses": clauses}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: db_pool.putconn(conn)
+
+class RedlineSaveRequest(BaseModel):
+    html_content: str
+
+@app.post("/api/documents/redline-save/{document_id}")
+def save_redline(document_id: str, req: RedlineSaveRequest, current_user: dict = Depends(verify_token)):
+    """Save edited HTML content back to a DOCX and update S3."""
+    if not db_pool:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT s3_key, filename FROM documents WHERE id = %s", (document_id,))
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Document not found")
+            
+            s3_key, filename = row
+            # Create a new version of the DOCX from HTML
+            new_s3_key = f"edited_{document_id}_{s3_key.split('/')[-1]}"
+            if not new_s3_key.endswith('.docx'):
+                new_s3_key = new_s3_key.replace('.pdf', '.docx')
+            
+            local_output = UPLOADS_DIR / new_s3_key
+            
+            # Convert HTML to DOCX
+            html2docx(req.html_content, str(local_output))
+            
+            # Upload to S3
+            s3_client.upload_file(str(local_output), BUCKET_NAME, new_s3_key)
+            
+            # Update DB with new S3 key or just record the edit
+            return {"message": "Redline saved successfully", "s3_key": new_s3_key}
+    except Exception as e:
+        print(f"[ERROR] Redline save error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: db_pool.putconn(conn)
+
+@app.post("/api/documents/redline-send/{document_id}")
+async def send_redline_to_customer(document_id: str, req: RedlineSaveRequest, current_user: dict = Depends(verify_token)):
+    """Save edited HTML to DOCX and share with customer."""
+    if not db_pool:
+        raise HTTPException(status_code=500, detail="Database not connected")
+    
+    # 1. Save locally and to S3 first
+    save_res = save_redline(document_id, req, current_user)
+    new_s3_key = save_res["s3_key"]
+    
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT user_id, document_type, filename FROM documents WHERE id = %s", (document_id,))
+            user_id, doc_type, orig_filename = cur.fetchone()
+            
+            # Using share_contract_with_client logic
+            new_filename = f"Updated_{orig_filename}"
+            if not new_filename.endswith('.docx'):
+                new_filename = new_filename.replace('.pdf', '.docx')
+                if not new_filename.endswith('.docx'): new_filename += '.docx'
+
+            # Insert into shared_contracts
+            cur.execute(
+                """INSERT INTO shared_contracts 
+                   (client_id, sender_id, document_type, filename, s3_key, status, message) 
+                   VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                (user_id, current_user["user_id"], doc_type, new_filename, new_s3_key, 'pending', "Updated contract following review.")
+            )
+            shared_id = cur.fetchone()[0]
+            
+            # Log activity
+            cur.execute(
+                "INSERT INTO activity_log (user_id, action, details) VALUES (%s, %s, %s)",
+                (current_user["user_id"], "Sent Updated Contract", f"Document ID: {document_id}")
+            )
+        conn.commit()
+        return {"message": "Document updated and sent to customer", "shared_id": shared_id}
+    except Exception as e:
+        if conn: conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn: db_pool.putconn(conn)
 
 if __name__ == "__main__":
     import uvicorn

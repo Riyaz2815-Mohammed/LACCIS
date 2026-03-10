@@ -157,17 +157,19 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
                                         >
                                             ⬇
                                         </button>
-                                        {doc.document_type !== 'Redlined' && (
+                                        {(!doc.document_type?.includes('Redlined') || isAdmin) && (
                                             <button
                                                 className="btn-action btn-review"
-                                                onClick={() => navigate(
-                                                    isAdmin
-                                                        ? `/review/${doc.id}`      // Legal/Admin → Master-Detail Review
-                                                        : `/analysis/${doc.id}`    // Client → Simple Analysis view
-                                                )}
-                                                title={isAdmin ? "Review Clauses (SBERT + AI)" : "View AI Analysis"}
+                                                onClick={() => {
+                                                    if (doc.document_type?.includes('Redlined')) {
+                                                        navigate(`/redline-review/${doc.id}`);
+                                                    } else {
+                                                        navigate(isAdmin ? `/review/${doc.id}` : `/analysis/${doc.id}`);
+                                                    }
+                                                }}
+                                                title={doc.document_type?.includes('Redlined') ? "Review Redlined Document" : (isAdmin ? "Review Clauses (SBERT + AI)" : "View AI Analysis")}
                                             >
-                                                {isAdmin ? '🔍 Review' : 'View'}
+                                                {doc.document_type?.includes('Redlined') ? '📝 Review' : (isAdmin ? '🔍 Review' : 'View')}
                                             </button>
                                         )}
                                     </div>
