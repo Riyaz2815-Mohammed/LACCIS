@@ -40,7 +40,7 @@ CREATE TABLE documents (
     user_role       TEXT        NOT NULL,
     size            BIGINT      DEFAULT 0,
     status          TEXT        NOT NULL DEFAULT 'uploaded'
-                    CHECK (status IN ('pending','uploaded','approved','rejected')),
+                    CHECK (status IN ('pending','uploaded','approved','rejected','completed')),
     is_finalized    BOOLEAN     NOT NULL DEFAULT FALSE,
     shared_with     JSONB       NOT NULL DEFAULT '[]',  -- array of user_ids or 'admin'
     uploaded_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
