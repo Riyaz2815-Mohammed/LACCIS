@@ -1,0 +1,39 @@
+.sbl-filename {
+    font-weight: 500;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sbl-empty-cell {
+    padding: 2.5rem 1rem;
+}
+
+.sbl-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-muted, #94a3b8);
+}
+
+.sbl-empty-icon {
+    font-size: 2rem;
+}
+
+.sbl-empty p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Final badge — reuse site-wide badge variables */
+.badge-final {
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 0.25rem 0.65rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}

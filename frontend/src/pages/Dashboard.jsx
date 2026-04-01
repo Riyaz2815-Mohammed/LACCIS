@@ -32,11 +32,23 @@ function Dashboard({ user, onLogout }) {
 
             const clientsData = await clientsRes.json();
             const docsData = await docsRes.json();
+            const sharedData = sharedRes.ok ? await sharedRes.json() : { contracts: [] };
 
             if (clientsRes.ok && docsRes.ok) {
-                const documents = docsData.documents || [];
-                // Sort by last modified/created (using id as proxy if date not available)
-                const sorted = [...documents].sort((a, b) => (b.id > a.id ? 1 : -1)).slice(0, 5);
+                // Merge regular documents and shared contracts smoothly
+                const baseDocs = docsData.documents || [];
+                const sharedContracts = sharedData.contracts || [];
+                // Map shared_contracts to match standard documents shape for counting
+                const mappedContracts = sharedContracts.map(c => ({
+                    ...c,
+                    shared_with: [c.client_id], // Used below to attach to specific client mapping
+                    user_role: 'legal_team'
+                }));
+
+                const documents = [...baseDocs, ...mappedContracts];
+
+                // Sort by last modified/created (using uploaded_at or date proxy)
+                const sorted = [...documents].sort((a, b) => (b.uploaded_at > a.uploaded_at ? 1 : -1)).slice(0, 5);
                 setRecentDocs(sorted);
 
                 let sumTotalDocs = 0;

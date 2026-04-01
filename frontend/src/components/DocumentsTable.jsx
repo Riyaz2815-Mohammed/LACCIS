@@ -15,7 +15,8 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
         return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
     };
 
-    const getStatusBadge = (status) => {
+    const getStatusBadge = (status, isFinal) => {
+        if (isFinal) return { class: 'badge-success', text: '✔ Final' };
         const badges = {
             'pending': { class: 'badge-pending', text: 'Pending Approval' },
             'approved': { class: 'badge-success', text: 'Approved' },
@@ -133,7 +134,8 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
             {tableHead}
             <tbody>
                 {documents.map((doc) => {
-                    const statusBadge = getStatusBadge(doc.status);
+                    const isFinal = (doc.document_type && doc.document_type.includes('Final')) || doc.is_finalized || doc.is_final || false;
+                    const statusBadge = getStatusBadge(doc.status, isFinal);
                     return (
                         <tr key={doc.id}>
                             <td>{doc.filename}</td>
@@ -144,7 +146,9 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
                                     fontSize: '0.875rem'
                                 }}>
                                     {doc.document_type || 'Others'}
-                                    {doc.is_finalized ? '(Final)' : (doc.client_marked_final ? '(Client Final)' : '')}
+                                    {(!doc.document_type || !doc.document_type.includes('Final')) &&
+                                        (doc.is_finalized ? ' (Final)' : (doc.client_marked_final ? ' (Client Final)' : ''))
+                                    }
                                 </span>
                             </td>
                             <td>{new Date(doc.uploaded_at).toLocaleDateString()}</td>
@@ -157,7 +161,8 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
                             {!hideActions && (
                                 <td>
                                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                        {isAdmin && (doc.status === 'pending' || doc.status === 'uploaded') && (
+                                        {/* Accept / Reject — hidden if final */}
+                                        {isAdmin && !isFinal && (doc.status === 'pending' || doc.status === 'uploaded') && (
                                             <>
                                                 <button
                                                     className="btn-action btn-approve-full"
@@ -182,29 +187,34 @@ function DocumentsTable({ documents, loading, onApprove, onReject, onDownload, o
                                         >
                                             ⬇
                                         </button>
-                                        <button
-                                            className="btn-action btn-review"
-                                            onClick={() => handleReviewClick(doc)}
-                                            title={isAdmin ? "Review Clauses (SBERT + AI)" : "View AI Analysis"}
-                                            disabled={loadingDocs[doc.id]}
-                                        >
-                                            {loadingDocs[doc.id] 
-                                                ? <span className="spinner-small" style={{ margin: '0 8px' }}/> 
-                                                : (isAdmin ? ' Review' : 'View')
-                                            }
-                                        </button>
+                                        {/* Review button — hidden when document is final */}
+                                        {!isFinal && (
+                                            <button
+                                                className="btn-action btn-review"
+                                                onClick={() => handleReviewClick(doc)}
+                                                title={isAdmin ? "Review Clauses (SBERT + AI)" : "View AI Analysis"}
+                                                disabled={loadingDocs[doc.id]}
+                                            >
+                                                {loadingDocs[doc.id]
+                                                    ? <span className="spinner-small" style={{ margin: '0 8px' }} />
+                                                    : (isAdmin ? ' Review' : 'View')
+                                                }
+                                            </button>
+                                        )}
                                     </div>
                                 </td>
                             )}
                             {isAdmin && (
                                 <td style={{ textAlign: 'center' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={doc.is_finalized || false}
-                                        onChange={() => onFinalize && onFinalize(doc.id)}
-                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                        title="Mark as Finalized"
-                                    />
+                                    {(!doc.document_type || !doc.document_type.includes('Redline')) && (
+                                        <input
+                                            type="checkbox"
+                                            checked={doc.is_finalized || false}
+                                            onChange={() => onFinalize && onFinalize(doc.id)}
+                                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                            title="Mark as Finalized"
+                                        />
+                                    )}
                                 </td>
                             )}
                         </tr>

@@ -4,6 +4,7 @@ import Layout from '../layouts/Layout';
 import WorkspaceTabs from '../components/WorkspaceTabs';
 import ChatBox from '../components/ChatBox';
 import DocumentsTable from '../components/DocumentsTable';
+import SentByLegalTable from '../components/SentByLegalTable';
 import StatusBadge from '../components/StatusBadge';
 import ActivityList from '../components/ActivityList';
 import './ClientWorkspace.css';
@@ -15,6 +16,7 @@ const ClientWorkspace = ({ user, onLogout }) => {
     const [client, setClient] = useState(null);
     const [activeTab, setActiveTab] = useState('documents');
     const [documents, setDocuments] = useState([]);
+    const [legalSentDocs, setLegalSentDocs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activities, setActivities] = useState([]);
     const [activitiesLoading, setActivitiesLoading] = useState(false);
@@ -39,15 +41,24 @@ const ClientWorkspace = ({ user, onLogout }) => {
 
             const clientsData = await clientsRes.json();
             const docsData = await docsRes.json();
+            const legalDocsData = await legalDocsRes.json();
 
-            if (clientsRes.ok && docsRes.ok) {
+            if (clientsRes.ok && docsRes.ok && legalDocsRes.ok) {
                 const currentClient = clientsData.clients.find(c => c.id === clientId);
                 if (!currentClient) {
                     navigate('/dashboard');
                     return;
                 }
                 setClient(currentClient);
-                setDocuments(docsData.documents.filter(d => d.user_id === clientId));
+                const allClientDocs = docsData.documents.filter(d =>
+                    d.user_id === clientId ||
+                    (d.shared_with && d.shared_with.includes(clientId))
+                );
+                // Set client-uploaded docs (exclude legal uploads if any are still in there)
+                setDocuments(allClientDocs.filter(d => d.user_role !== 'legal_team' && d.user_role !== 'admin'));
+
+                // Set explicitly shared legal documents
+                setLegalSentDocs(legalDocsData.contracts || []);
             }
         } catch (error) {
             console.error('Error loading workspace data:', error);
@@ -265,6 +276,21 @@ const ClientWorkspace = ({ user, onLogout }) => {
                                         onFinalize={handleFinalize}
                                     />
                                 </div>
+
+                                {/* Documents sent by the legal team to this client */}
+                                <div className="section-actions" style={{ marginTop: '2.5rem' }}>
+                                    <h2>Documents Sent by You</h2>
+                                    <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: '0.25rem 0 0' }}>
+                                        Contracts and documents you shared with this client
+                                    </p>
+                                </div>
+                                <div className="workspace-card" style={{ marginTop: '1rem' }}>
+                                    <SentByLegalTable
+                                        documents={legalSentDocs}
+                                        loading={false}
+                                        onFinalize={handleFinalize}
+                                    />
+                                </div>
                             </div>
                         )}
 
@@ -296,7 +322,7 @@ const ClientWorkspace = ({ user, onLogout }) => {
                                     <h2>Share Contract with Client</h2>
                                     <p>Upload a contract to share directly with <strong>{client.name}</strong></p>
                                 </div>
-                            
+
                                 <div className="workspace-card share-card">
                                     {/* Contract Type Dropdown */}
                                     <div className="share-notes-section" style={{ marginBottom: '1.5rem' }}>

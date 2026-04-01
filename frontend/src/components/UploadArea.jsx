@@ -227,18 +227,21 @@ function UploadArea({ onUploadComplete, documentType: externalDocumentType }) {
                         </button>
                     </div>
 
-                    <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <input
-                            type="checkbox"
-                            id="isFinalCheckbox"
-                            checked={isFinalized}
-                            onChange={(e) => setIsFinalized(e.target.checked)}
-                            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
-                        />
-                        <label htmlFor="isFinalCheckbox" style={{ fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
-                            Mark as Final Document
-                        </label>
-                    </div>
+                    {/* Hide "Mark as Final" for Redlined uploads — only allow it for own contracts */}
+                    {externalDocumentType !== 'Redlined' && (
+                        <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <input
+                                type="checkbox"
+                                id="isFinalCheckbox"
+                                checked={isFinalized}
+                                onChange={(e) => setIsFinalized(e.target.checked)}
+                                style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+                            />
+                            <label htmlFor="isFinalCheckbox" style={{ fontWeight: 600, color: '#475569', cursor: 'pointer' }}>
+                                Mark as Final Document
+                            </label>
+                        </div>
+                    )}
                 </div>
             )
             }

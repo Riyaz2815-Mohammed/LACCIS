@@ -189,8 +189,20 @@ export default function ClauseReview({ user, onLogout }) {
 
     const doc = data?.document;
     const clauses = data?.clauses || [];
-    const status = data?.status;
+    const status = doc?.status || data?.status;
     const isProcessing = status === 'processing';
+
+    if (isProcessing) {
+        return (
+            <Layout user={user} onLogout={onLogout} pageTitle="Review">
+                <div className="review-processing" style={{ height: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="spinner" style={{ width: '40px', height: '40px', borderWidth: '4px', marginBottom: '1rem' }} />
+                    <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Analyzing contract clauses...</h3>
+                    <p style={{ color: 'var(--text-secondary)' }}>Extracting risk factors and comparing to standard library.</p>
+                </div>
+            </Layout>
+        );
+    }
 
     // --- Actions ---
 
@@ -563,7 +575,7 @@ export default function ClauseReview({ user, onLogout }) {
                     <div className="footer-left">
                         <div className="final-actions-group">
                             <button className="btn-footer primary" onClick={handleDownloadRedline} disabled={actionLoading}>
-                                {actionLoading ? <span className="spinner-small" style={{ margin: '0 8px' }}/> : ' Download Redline'}
+                                {actionLoading ? <span className="spinner-small" style={{ margin: '0 8px' }} /> : ' Download Redline'}
                             </button>
                             <button className="btn-footer primary" onClick={handleSendRedline} disabled={sendingRedline || actionLoading}>
                                 {sendingRedline ? 'Sending...' : ' Send Redline to Client'}
